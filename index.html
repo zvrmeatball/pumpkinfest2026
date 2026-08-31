@@ -117,6 +117,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   box-shadow: 0 2px 8px rgba(0,0,0,0.35);
   cursor: pointer;
 }
+
+/* GPS "you are here" circle marker (not a drop-pin) */
+.gps-loc-dot {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #2196f3; border: 3px solid #fff;
+  box-shadow: 0 0 0 2px rgba(33,150,243,0.5), 0 2px 8px rgba(0,0,0,0.35);
+  display: flex; align-items: center; justify-content: center;
+}
+.gps-loc-dot .gps-loc-core {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #fff; display: block;
+}
 .maplibregl-popup-content-wrapper { border-radius: 12px; }
 .maplibregl-popup-content { margin: 10px 14px; min-width: 140px; }
 .pin-popup h3 { color: #ff6b35; margin-bottom: 2px; font-size: 1rem; }
@@ -369,8 +381,11 @@ function ensureGpsLayers() {
   if (gpsMarker) return;
   // Accuracy circle (canvas overlay keeps it screen-space, not distorted by rotation/tilt)
   gpsAccLayer = document.getElementById('gps-acc');
-  // GPS dot as a MapLibre marker
-  gpsMarker = new maplibregl.Marker({ color: '#2196f3', draggable: false })
+  // GPS dot as a custom CIRCLE marker ("you are here" dot, not a drop-pin)
+  const gpsEl = document.createElement('div');
+  gpsEl.className = 'gps-loc-dot';
+  gpsEl.innerHTML = '<span class="gps-loc-core"></span>';
+  gpsMarker = new maplibregl.Marker({ element: gpsEl, anchor: 'center', draggable: false })
     .setLngLat([gpsLng, gpsLat])
     .addTo(map);
 }
