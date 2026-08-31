@@ -11,33 +11,29 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 #map { position: fixed; top: 0; left: 0; right: 0; bottom: 0; }
 
-/* Zoom + rotation controls */
-#zoom-controls {
-  position: fixed; top: 12px; left: 12px; z-index: 10001;
-  display: flex; flex-direction: column; gap: 2px;
+/* ====== TOP-LEFT CONTROL PANEL (zoom + nav) ====== */
+#top-controls {
+  position: fixed; top: 14px; left: 14px; z-index: 10001;
+  display: flex; flex-direction: column; align-items: stretch; gap: 8px;
 }
-#zoom-controls button {
-  width: 36px; height: 36px;
-  background: rgba(255,255,255,0.9); border: 1px solid rgba(0,0,0,0.15);
-  border-radius: 4px; font-size: 1.2rem; font-weight: bold;
-  cursor: pointer; color: #333; line-height: 1;
-  box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+/* Nav buttons (🧭 north / 🗺 reset) + zoom (−/+) in one glass card */
+.ctrl-card {
+  background: rgba(22, 24, 40, 0.82); backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 16px; box-shadow: 0 6px 24px rgba(0,0,0,0.45);
+  display: flex; flex-direction: column; overflow: hidden;
+  width: 46px;
 }
-#zoom-controls button:active { background: #eee; }
-
-/* North-up / tilt reset (right column) */
-#nav-controls {
-  position: fixed; top: 12px; left: 58px; z-index: 10001;
-  display: flex; flex-direction: column; gap: 4px;
+.ctrl-card button {
+  width: 46px; height: 44px; border: none; background: transparent;
+  color: #e8e8f0; font-size: 1.15rem; cursor: pointer; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s;
 }
-#nav-controls button {
-  width: 38px; height: 38px;
-  background: rgba(255,255,255,0.92); border: 1px solid rgba(0,0,0,0.15);
-  border-radius: 50%; font-size: 1rem; font-weight: bold;
-  cursor: pointer; color: #333; line-height: 1;
-  box-shadow: 0 1px 5px rgba(0,0,0,0.2);
-}
-#nav-controls button:active { background: #eee; }
+.ctrl-card button + button { border-top: 1px solid rgba(255,255,255,0.07); }
+.ctrl-card button:hover { background: rgba(255,255,255,0.1); color: #fff; }
+.ctrl-card button:active { background: rgba(255,120,60,0.35); }
+.ctrl-card .zoom-btn { font-size: 1.35rem; font-weight: 600; color: #ff9a62; }
 
 /* Calibration panel */
 #cal-panel {
@@ -57,41 +53,49 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 #cal-panel button:hover { background: #e85d2a; }
 #cal-panel button.sec { background: rgba(255,255,255,0.1); margin-top: 4px; padding: 10px 20px; font-size: 0.9rem; }
 
-/* Bottom bar */
+/* ====== BOTTOM ACTION DOCK ====== */
 #bottom-bar {
-  position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
-  background: rgba(20,20,40,0.93); backdrop-filter: blur(12px);
-  border-radius: 16px; padding: 8px 10px; z-index: 9999;
-  display: flex; flex-wrap: wrap; gap: 5px; align-items: center; justify-content: center;
-  border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  background: rgba(22, 24, 40, 0.82); backdrop-filter: blur(16px);
+  border-radius: 18px; padding: 8px; z-index: 9999;
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center;
+  border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 8px 30px rgba(0,0,0,0.5);
   max-width: 96vw;
 }
 #bottom-bar button {
-  background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.1);
-  padding: 9px 12px; border-radius: 10px; font-size: 0.82rem; cursor: pointer; font-weight: 500;
-  white-space: nowrap; transition: all 0.15s; min-height: 38px; touch-action: manipulation;
+  background: rgba(255,255,255,0.07); color: #f0f0f6; border: 1px solid rgba(255,255,255,0.08);
+  padding: 10px 14px; border-radius: 12px; font-size: 0.82rem; cursor: pointer; font-weight: 500;
+  white-space: nowrap; transition: all 0.15s; min-height: 42px; touch-action: manipulation;
+  display: inline-flex; align-items: center; gap: 6px;
 }
 #bottom-bar button:active { transform: scale(0.95); }
-#bottom-bar button.active { background: #ff6b35; border-color: #ff6b35; }
-#bottom-bar button:hover { background: rgba(255,255,255,0.15); }
-#bottom-bar .gps-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 3px; vertical-align: middle; }
+#bottom-bar button.active { background: linear-gradient(135deg,#ff6b35,#ff9a62); border-color: transparent; color: #fff; box-shadow: 0 3px 12px rgba(255,107,53,0.4); }
+#bottom-bar button:hover { background: rgba(255,255,255,0.14); }
+#bottom-bar button.danger { color: #ff8a80; }
+#bottom-bar button.danger:hover { background: rgba(255,107,87,0.18); }
+#bottom-bar .gps-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 2px; }
 #bottom-bar .gps-dot.fix { background: #4caf50; box-shadow: 0 0 8px #4caf50; }
 #bottom-bar .gps-dot.no-fix { background: #f44336; }
-#bottom-bar .acc-label { color: #888; font-size: 0.72rem; min-width: 40px; text-align: center; }
+/* Accuracy chip, full width on its own line */
+#bottom-bar .acc-label {
+  flex-basis: 100% !important; order: 10; text-align: center;
+  color: #9aa0b4; font-size: 0.72rem; padding: 4px 0 2px;
+}
 
-/* Opacity bar */
+/* ====== OPACITY / OVERLAY CARD ====== */
 #opacity-bar {
-  position: fixed; bottom: 82px; left: 50%; transform: translateX(-50%);
-  background: rgba(20,20,40,0.93); backdrop-filter: blur(12px);
-  border-radius: 12px; padding: 6px 14px; z-index: 9999;
-  display: flex; gap: 8px; align-items: center;
-  border: 1px solid rgba(255,255,255,0.08);
+  position: fixed; bottom: 116px; left: 50%; transform: translateX(-50%);
+  background: rgba(22, 24, 40, 0.82); backdrop-filter: blur(16px);
+  border-radius: 14px; padding: 7px 16px; z-index: 9999;
+  display: flex; gap: 10px; align-items: center;
+  border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 6px 24px rgba(0,0,0,0.45);
   max-width: 96vw;
 }
-#opacity-bar label { color: #999; font-size: 0.75rem; }
+#opacity-bar label { color: #aab0c4; font-size: 0.74rem; font-weight: 500; }
 #opacity-bar input[type=range] { width: 100px; accent-color: #ff6b35; height: 4px; }
-#opacity-bar .val { color: #fff; font-size: 0.75rem; min-width: 28px; text-align: center; font-weight: 600; }
-#opacity-bar .eye-btn { background: rgba(255,255,255,0.08); border: none; color: #fff; padding: 2px 8px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; line-height: 1; }
+#opacity-bar .val { color: #fff; font-size: 0.74rem; min-width: 30px; text-align: center; font-weight: 700; }
+#opacity-bar .eye-btn { background: rgba(255,255,255,0.08); border: none; color: #fff; padding: 4px 10px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; line-height: 1; transition: background 0.15s; }
+#opacity-bar .eye-btn:hover { background: rgba(255,255,255,0.15); }
 
 /* Rotation help toast */
 #rot-tip {
@@ -131,16 +135,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   /* Bottom bar wraps to multiple rows so nothing overflows the screen */
   #bottom-bar { bottom: 10px; padding: 8px; gap: 6px; }
   #bottom-bar button { padding: 9px 10px; font-size: 0.8rem; flex: 0 1 auto; }
-  /* Accuracy readout drops to its own centered line under the buttons */
-  #bottom-bar .acc-label { flex-basis: 100%; order: 10; text-align: center; font-size: 0.72rem; }
-  /* Opacity bar stays above the (possibly 2-row) bottom bar */
+  /* Opacity bar moves to top-right so it clears the dock on small screens */
   #opacity-bar { bottom: auto; top: 12px; right: 12px; left: auto; transform: none; }
-  /* Keep zoom/nav buttons out of conflict with the top-right opacity bar */
   #opacity-bar label, #opacity-bar .val { font-size: 0.7rem; }
   #opacity-bar input[type=range] { width: 80px; }
-  /* Smaller nav/zoom buttons so they don't crowd */
-  #zoom-controls { top: 12px; left: 12px; }
-  #nav-controls { top: 12px; left: 56px; }
+  /* Top-left control panel stays compact */
+  #top-controls { top: 12px; left: 12px; }
   #rot-tip { top: 52px; font-size: 0.72rem; white-space: normal; max-width: 90vw; text-align: center; }
 }
 </style>
@@ -172,16 +172,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 <div id="map"></div>
 
-<!-- Zoom controls -->
-<div id="zoom-controls">
-  <button onclick="map.zoomIn()">+</button>
-  <button onclick="map.zoomOut()">−</button>
-</div>
-
-<!-- North-up + tilt reset + reset view -->
-<div id="nav-controls">
-  <button onclick="northUp()" title="Reset rotation to north-up">🧭</button>
-  <button onclick="resetMap()" title="Reset view &amp; overlay position">🗺</button>
+<!-- Top-left controls: nav (north/reset) + zoom, in glass cards -->
+<div id="top-controls">
+  <div class="ctrl-card" id="nav-controls">
+    <button onclick="northUp()" title="Reset rotation to north-up">🧭</button>
+    <button onclick="resetMap()" title="Reset view &amp; overlay position">🗺</button>
+  </div>
+  <div class="ctrl-card" id="zoom-controls">
+    <button class="zoom-btn" onclick="map.zoomIn()" title="Zoom in">+</button>
+    <button class="zoom-btn" onclick="map.zoomOut()" title="Zoom out">−</button>
+  </div>
 </div>
 
 <div id="opacity-bar">
@@ -195,12 +195,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 <div id="bottom-bar">
   <button id="btn-gps" onclick="centerGPS()"><span class="gps-dot no-fix" id="gps-indicator"></span>GPS</button>
-  <span class="acc-label" id="acc-label"></span>
   <button id="btn-pin" onclick="togglePinMode()">📍 Pin</button>
-  <button onclick="deleteAllPins()">🗑 All</button>
+  <button class="danger" onclick="deleteAllPins()" title="Delete all pins">🗑 All</button>
   <button id="btn-sat" onclick="toggleSatellite()">🛰 Satellite</button>
-  <button onclick="location.href='diagnostics.html'">📡</button>
-  <button onclick="showHelp2()">❓</button>
+  <button title="GPS diagnostics" onclick="location.href='diagnostics.html'">📡</button>
+  <button title="Help" onclick="showHelp2()">❓</button>
+  <span class="acc-label" id="acc-label"></span>
 </div>
 
 <script src="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.js"></script>
