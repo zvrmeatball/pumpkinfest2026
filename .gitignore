@@ -1,0 +1,25 @@
+# ===== SECURITY: NEVER commit these =====
+# TLS/HTTPS private key + certificate for the local :8443 server
+cert.pem
+key.pem
+cert.conf
+
+# ===== Local build / OS junk =====
+.DS_Store
+Thumbs.db
+*.log
+
+# ===== Not needed for the live site =====
+# Backup files (old versions tracked locally only)
+*.bak-*
+index.html.pre-*
+index.html.leaflet-*
+*.2025-backup-*
+
+# Source files not referenced by the live map
+*.kmz
+*.kml
+
+# Old/unused overlay images (current one is pumpkinfest-overlay-2026.jpg)
+map-overlay.png
+map-overlay.jpg

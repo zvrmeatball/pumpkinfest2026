@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🎃 Pumpkinfest 2026 GPS Map</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.css" />
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; overflow: hidden; }
+
+#map { position: fixed; top: 0; left: 0; right: 0; bottom: 0; }
+
+/* Zoom + rotation controls */
+#zoom-controls {
+  position: fixed; top: 12px; left: 12px; z-index: 10001;
+  display: flex; flex-direction: column; gap: 2px;
+}
+#zoom-controls button {
+  width: 36px; height: 36px;
+  background: rgba(255,255,255,0.9); border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 4px; font-size: 1.2rem; font-weight: bold;
+  cursor: pointer; color: #333; line-height: 1;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+}
+#zoom-controls button:active { background: #eee; }
+
+/* North-up / tilt reset (right column) */
+#nav-controls {
+  position: fixed; top: 12px; left: 58px; z-index: 10001;
+  display: flex; flex-direction: column; gap: 4px;
+}
+#nav-controls button {
+  width: 38px; height: 38px;
+  background: rgba(255,255,255,0.92); border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 50%; font-size: 1rem; font-weight: bold;
+  cursor: pointer; color: #333; line-height: 1;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+}
+#nav-controls button:active { background: #eee; }
+
+/* Calibration panel */
+#cal-panel {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.88); z-index: 10000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 24px; color: #fff;
+  transition: opacity 0.4s;
+}
+#cal-panel.hidden { opacity: 0; pointer-events: none; }
+#cal-panel h2 { font-size: 1.6rem; margin-bottom: 8px; }
+#cal-panel p { font-size: 0.95rem; margin-bottom: 6px; text-align: center; max-width: 500px; line-height: 1.4; color: #bbb; }
+#cal-panel .step { font-size: 1.05rem; margin: 14px 0 4px; color: #ffb347; font-weight: bold; }
+#cal-panel ol { text-align: left; max-width: 480px; margin-bottom: 12px; }
+#cal-panel ol li { margin: 5px 0; font-size: 0.9rem; color: #ddd; line-height: 1.3; }
+#cal-panel button { background: #ff6b35; color: #fff; border: none; padding: 14px 40px; font-size: 1.1rem; border-radius: 12px; cursor: pointer; margin-top: 6px; font-weight: 600; width: 260px; max-width: 90%; }
+#cal-panel button:hover { background: #e85d2a; }
+#cal-panel button.sec { background: rgba(255,255,255,0.1); margin-top: 4px; padding: 10px 20px; font-size: 0.9rem; }
+
+/* Bottom bar */
+#bottom-bar {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: rgba(20,20,40,0.93); backdrop-filter: blur(12px);
+  border-radius: 16px; padding: 8px 12px; z-index: 9999;
+  display: flex; gap: 4px; align-items: center;
+  border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+}
+#bottom-bar button {
+  background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.1);
+  padding: 7px 12px; border-radius: 10px; font-size: 0.8rem; cursor: pointer; font-weight: 500;
+  white-space: nowrap; transition: all 0.15s;
+}
+#bottom-bar button:active { transform: scale(0.95); }
+#bottom-bar button.active { background: #ff6b35; border-color: #ff6b35; }
+#bottom-bar button:hover { background: rgba(255,255,255,0.15); }
+#bottom-bar .gps-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 3px; vertical-align: middle; }
+#bottom-bar .gps-dot.fix { background: #4caf50; box-shadow: 0 0 8px #4caf50; }
+#bottom-bar .gps-dot.no-fix { background: #f44336; }
+#bottom-bar .acc-label { color: #888; font-size: 0.7rem; min-width: 40px; text-align: center; }
+
+/* Opacity bar */
+#opacity-bar {
+  position: fixed; bottom: 78px; left: 50%; transform: translateX(-50%);
+  background: rgba(20,20,40,0.93); backdrop-filter: blur(12px);
+  border-radius: 12px; padding: 6px 14px; z-index: 9999;
+  display: flex; gap: 8px; align-items: center;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+#opacity-bar label { color: #999; font-size: 0.75rem; }
+#opacity-bar input[type=range] { width: 100px; accent-color: #ff6b35; height: 4px; }
+#opacity-bar .val { color: #fff; font-size: 0.75rem; min-width: 28px; text-align: center; font-weight: 600; }
+#opacity-bar .eye-btn { background: rgba(255,255,255,0.08); border: none; color: #fff; padding: 2px 8px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; line-height: 1; }
+
+/* Rotation help toast */
+#rot-tip {
+  position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+  background: rgba(20,20,40,0.93); color: #fff; padding: 8px 14px;
+  border-radius: 20px; font-size: 0.8rem; z-index: 10002;
+  border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  opacity: 0; transition: opacity 0.4s; pointer-events: none; white-space: nowrap;
+}
+#rot-tip.show { opacity: 1; }
+
+.place-cursor { cursor: crosshair !important; }
+
+/* Pin marker */
+.custom-marker {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; border: 2.5px solid #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+  cursor: pointer;
+}
+.maplibregl-popup-content-wrapper { border-radius: 12px; }
+.maplibregl-popup-content { margin: 10px 14px; min-width: 140px; }
+.pin-popup h3 { color: #ff6b35; margin-bottom: 2px; font-size: 1rem; }
+.pin-popup .type { font-size: 0.78rem; color: #999; }
+.pin-popup .coords { font-size: 0.7rem; color: #bbb; margin-top: 4px; }
+.pin-popup .del-pin-btn { background: #e74c3c; color: #fff; border: none; padding: 6px 16px; border-radius: 8px; font-size: 0.8rem; cursor: pointer; margin-top: 8px; width: 100%; font-weight: 600; }
+
+/* GPS accuracy circle (canvas overlay) */
+#gps-acc {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 500;
+}
+</style>
+</head>
+<body>
+
+<div id="cal-panel">
+  <h2>🎃 Pumpkinfest GPS Map</h2>
+  <p>North Smithfield High School — georeferenced overlay</p>
+  <div class="step">📱 Open on your phone</div>
+  <ol>
+    <li><strong>Enable GPS/location</strong> on your phone</li>
+    <li>Tap <strong>Let's Go!</strong> — your blue dot appears</li>
+  </ol>
+  <div class="step">📍 Pins</div>
+  <ol>
+    <li>Tap <strong>📍 Pin</strong>, then tap the map to place</li>
+    <li>Tap a pin to see its info and <strong>delete button</strong></li>
+  </ol>
+  <div class="step">🔄 New: Rotate &amp; Tilt</div>
+  <ol>
+    <li>Two-finger <strong>twist</strong> to rotate the map</li>
+    <li>Two-finger <strong>drag up/down</strong> to tilt (3D)</li>
+    <li>Tap <strong>🧭</strong> to snap back to north-up</li>
+  </ol>
+  <button onclick="doneCal()">Let's Go!</button>
+  <button class="sec" onclick="skipCal()">Skip</button>
+</div>
+
+<div id="map"></div>
+
+<!-- Zoom controls -->
+<div id="zoom-controls">
+  <button onclick="map.zoomIn()">+</button>
+  <button onclick="map.zoomOut()">−</button>
+</div>
+
+<!-- North-up + tilt reset + reset view -->
+<div id="nav-controls">
+  <button onclick="northUp()" title="Reset rotation to north-up">🧭</button>
+  <button onclick="resetMap()" title="Reset view &amp; overlay position">🗺</button>
+</div>
+
+<div id="opacity-bar">
+  <label>Overlay</label>
+  <input type="range" id="op-slider" min="0" max="100" value="100" oninput="setOverlayOpacity(this.value/100)">
+  <span class="val" id="op-label">100%</span>
+  <button class="eye-btn" onclick="toggleOverlayVis()" id="eye-btn">👁</button>
+</div>
+
+<div id="rot-tip">🔄 Two-finger twist to rotate · drag to tilt</div>
+
+<div id="bottom-bar">
+  <button id="btn-gps" onclick="centerGPS()"><span class="gps-dot no-fix" id="gps-indicator"></span>GPS</button>
+  <span class="acc-label" id="acc-label"></span>
+  <button id="btn-pin" onclick="togglePinMode()">📍 Pin</button>
+  <button onclick="deleteAllPins()">🗑 All</button>
+  <button id="btn-sat" onclick="toggleSatellite()">🛰 Satellite</button>
+  <button onclick="location.href='diagnostics.html'">📡</button>
+  <button onclick="showHelp2()">❓</button>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.js"></script>
+<script>
+const CENTER = [41.9526764, -71.5450639]; // [lat, lng]
+const ZOOM = 18;
+const MAX_ZOOM = 21;
+
+// ====== MAP SETUP ======
+const map = new maplibregl.Map({
+  container: 'map',
+  style: 'https://tiles.openfreemap.org/styles/liberty',  // free OSM vector tiles, no key
+  center: [CENTER[1], CENTER[0]],   // MapLibre uses [lng, lat]
+  zoom: ZOOM,
+  maxZoom: MAX_ZOOM,
+  attributionControl: false,
+  bearing: 63.5,  // start rotated to level the -63.53° overlay on screen (north-up is 0; 🧭 resets to this)
+  pitch: 0,     // tilt starts flat
+  dragRotate: true,     // one-finger drag-rotate (desktop right-drag)
+  touchPitch: true,     // two-finger tilt on touch
+  touchZoomRotate: true // two-finger twist to rotate on touch
+});
+
+map.addControl(new maplibregl.NavigationControl({ showCompass: true, showZoom: false }), 'top-right');
+
+// ====== OVERLAY (raster image) ======
+// 2026 Pumpkinfest overlay (NEW-Pumpkinfest-Map-2026.jpg), georeferenced in Google Earth Pro.
+// KML LatLonBox: north=41.9532973975965 south=41.95201668794581 east=-71.54364396423058
+//   west=-71.54647910665386 rotation=-63.52793884277344 deg (CCW).
+// MapLibre image source has NO rotation support, so we pass the 4 pre-rotated corner
+// coordinates (computed around box center) in MapLibre order TL,TR,BR,BL as [lng,lat].
+const overlayCorners = [
+  [-71.54492267, 41.9538862],   // top-left
+  [-71.54365887, 41.95199878],  // top-right
+  [-71.5452004,  41.95142789],  // bottom-right
+  [-71.5464642,  41.95331531]   // bottom-left
+];
+
+let overlayAdded = false;
+function ensureOverlay() {
+  if (overlayAdded) return;
+  map.addSource('overlay-img', {
+    type: 'image',
+    url: 'pumpkinfest-overlay-2026.jpg',
+    coordinates: overlayCorners
+  });
+  map.addLayer({
+    id: 'overlay-layer',
+    type: 'raster',
+    source: 'overlay-img',
+    paint: { 'raster-opacity': currentOpacity, 'raster-fade-duration': 0 }
+  });
+  overlayAdded = true;
+  overlayVis = true;
+}
+let currentOpacity = 1.0;
+let overlayVis = false;
+
+map.on('load', function() {
+  ensureOverlay();
+  try { loadPins(); } catch(e) {}
+});
+
+function setOverlayOpacity(v) {
+  currentOpacity = v;
+  if (overlayAdded && map.getLayer('overlay-layer')) {
+    map.setPaintProperty('overlay-layer', 'raster-opacity', v);
+  }
+  document.getElementById('op-label').textContent = Math.round(v*100)+'%';
+}
+
+function toggleOverlayVis() {
+  if (overlayVis) {
+    if (overlayAdded && map.getLayer('overlay-layer')) map.removeLayer('overlay-layer');
+    overlayVis = false;
+    document.getElementById('eye-btn').textContent = '👁‍🗨';
+  } else {
+    if (overlayAdded && !map.getLayer('overlay-layer')) map.addLayer({ id:'overlay-layer', type:'raster', source:'overlay-img', paint:{'raster-opacity':currentOpacity,'raster-fade-duration':0} });
+    overlayVis = true;
+    document.getElementById('eye-btn').textContent = '👁';
+  }
+}
+
+// ====== ROTATION / TILT ======
+// Default view is rotated +63.5° to level the -63.53° overlay on screen.
+const START_BEARING = 63.5;
+function northUp() {
+  map.easeTo({ bearing: START_BEARING, pitch: 0, duration: 800 });
+}
+// Show a helpful toast the first time the map is rotated
+let rotTipShown = false;
+map.on('rotatestart', () => { if (!rotTipShown) showRotTip(); });
+function showRotTip() {
+  rotTipShown = true;
+  var t = document.getElementById('rot-tip');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ====== GPS ======
+let gpsMarker = null, gpsAccLayer = null, gpsWatch = null;
+let gpsFix = false;
+let gpsLat = null, gpsLng = null;   // "display" position the dot currently shows (interpolated)
+
+// --- Smooth-drift engine ---
+// The GPS watcher records the NEWEST raw (smoothed) fix into gpsRaw*.
+// A 250ms interval "pings" and adopts that fix as the target (gpsTarget*).
+// A requestAnimationFrame loop eases the displayed gpsLat/gpsLng toward the
+// target: it moves a fraction of the remaining distance each frame, so it
+// drifts quickly when far and eases in as it closes, but never stalls.
+let gpsRawLat = null, gpsRawLng = null;   // newest fix from watcher
+let gpsTargetLat = null, gpsTargetLng = null; // adopted target every 250ms
+let gpsPingTimer = null;    // setInterval (250ms)
+let gpsAnimRaf = null;      // requestAnimationFrame id
+const GPS_PING_MS = 250;            // "ping" every 1/4 second
+const GPS_DRIFT_BASE = 0.10;        // fraction of remaining distance per frame (~0.5s glide)
+const GPS_DRIFT_MIN_STEP = 0.06;    // meters moved per frame floor (never feels fully stuck)
+const GPS_MAX_FRAME_MS = 120;       // clamp per-frame step when a frame stalls
+
+// --- accuracy smoothing (same as before) ---
+let smooth = null, smoothCount = 0;
+let bestFixAcc = null;
+let lastJumpLat = null, lastJumpLng = null, lastJumpT = null;
+const MAX_SPEED_FOR_JUMP = 25;
+
+function haversineMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000, toRad = Math.PI / 180;
+  const dLat = (lat2-lat1)*toRad, dLng = (lng2-lng1)*toRad;
+  const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*toRad)*Math.cos(lat2*toRad)*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+function filterFix(lat, lng, acc) {
+  if (bestFixAcc === null || acc < bestFixAcc) bestFixAcc = acc;
+  if (smooth && lastJumpLat !== null && lastJumpLng !== null && lastJumpT !== null) {
+    const now = performance.now();
+    const dt = (now - lastJumpT) / 1000;
+    if (dt > 0) {
+      const dist = haversineMeters(lat, lng, lastJumpLat, lastJumpLng);
+      if (dist > 15 && dist / dt > MAX_SPEED_FOR_JUMP) return null;
+    }
+  }
+  lastJumpLat = lat; lastJumpLng = lng; lastJumpT = performance.now();
+  const w = Math.min(1, 20 / Math.max(acc, 1));
+  if (smooth === null || smoothCount === 0) {
+    smooth = { lat, lng, acc };
+  } else {
+    const prevWeight = 1 - w;
+    smooth.lat = smooth.lat * prevWeight + lat * w;
+    smooth.lng = smooth.lng * prevWeight + lng * w;
+    smooth.acc = acc;
+  }
+  smoothCount++;
+  return { lat: smooth.lat, lng: smooth.lng, acc: smooth.acc };
+}
+function resetGPSFilter() {
+  smooth = null; smoothCount = 0; bestFixAcc = null;
+  lastJumpLat = lastJumpLng = lastJumpT = null;
+}
+function accuracyLabel(a) {
+  if (a < 3) return '🟢 ' + a.toFixed(1) + 'm';
+  else if (a < 8) return '🟡 ' + a.toFixed(1) + 'm';
+  else return '🟠 ' + a.toFixed(1) + 'm';
+}
+
+function ensureGpsLayers() {
+  if (gpsMarker) return;
+  // Accuracy circle (canvas overlay keeps it screen-space, not distorted by rotation/tilt)
+  gpsAccLayer = document.getElementById('gps-acc');
+  // GPS dot as a MapLibre marker
+  gpsMarker = new maplibregl.Marker({ color: '#2196f3', draggable: false })
+    .setLngLat([gpsLng, gpsLat])
+    .addTo(map);
+}
+function updateGpsAccCircle(lat, lng, accMeters) {
+  // Convert accuracy (m) + center to screen pixels via map.project
+  if (!gpsAccLayer) return;
+  const p = map.project([lng, lat]);
+  const p2 = map.project([lng, lat - (accMeters/111000)]);
+  const rpx = Math.max(2, Math.abs(p.y - p2.y));
+  var ctx = gpsAccLayer.getContext && gpsAccLayer.getContext('2d');
+  if (!ctx) return;
+  const dpr = window.devicePixelRatio || 1;
+  gpsAccLayer.width = gpsAccLayer.clientWidth * dpr;
+  gpsAccLayer.height = gpsAccLayer.clientHeight * dpr;
+  ctx.clearRect(0,0,gpsAccLayer.width,gpsAccLayer.height);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, rpx, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(33,150,243,0.08)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(33,150,243,0.25)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+// ====== SMOOTH-DRIFT ANIMATION ENGINE ======
+// Runs a 250ms ping interval that adopts the newest raw fix as the target,
+// then a requestAnimationFrame loop that eases the visible dot toward it.
+function startGpsPing() {
+  if (gpsPingTimer) return;
+  gpsPingTimer = setInterval(function() {
+    if (gpsRawLat !== null && gpsRawLng !== null) {
+      gpsTargetLat = gpsRawLat;
+      gpsTargetLng = gpsRawLng;
+    }
+  }, GPS_PING_MS);
+}
+function gpsAnimationFrame(now) {
+  gpsAnimRaf = requestAnimationFrame(gpsAnimationFrame);
+  if (gpsTargetLat === null || gpsTargetLng === null) return;
+  if (gpsLat === null || gpsLng === null) { gpsLat = gpsTargetLat; gpsLng = gpsTargetLng; }
+  // Remaining distance (meters)
+  const dist = haversineMeters(gpsLat, gpsLng, gpsTargetLat, gpsTargetLng);
+  // Move a fraction of the remaining distance each frame (ease-out):
+  // far away => big step (fast), closer => smaller step (gentle).
+  let step = dist * GPS_DRIFT_BASE;
+  // Floor: never move slower than GPS_DRIFT_MIN_STEP m/frame, so it never feels stuck.
+  const floor = GPS_DRIFT_MIN_STEP;
+  if (step < floor && dist > 0) step = Math.min(floor, dist);
+  // Bearing from current display position to the target
+  const ang = Math.atan2(
+    (gpsTargetLng - gpsLng) * Math.cos((gpsLat + gpsTargetLat) / 2 * Math.PI / 180),
+    gpsTargetLat - gpsLat
+  );
+  // Convert step (meters) to lat/lng deltas (ang is from-north: cos->north, sin->east)
+  const dLat = step * Math.cos(ang) / 111320;
+  const dLng = step * Math.sin(ang) / (111320 * Math.cos(gpsLat * Math.PI / 180));
+  gpsLat += dLat;
+  gpsLng += dLng;
+  // Snap when essentially there
+  if (gpsTargetLat !== null && haversineMeters(gpsLat, gpsLng, gpsTargetLat, gpsTargetLng) < 0.05) {
+    gpsLat = gpsTargetLat; gpsLng = gpsTargetLng;
+  }
+  if (gpsMarker) gpsMarker.setLngLat([gpsLng, gpsLat]);
+  if (gpsFix) updateGpsAccCircle(gpsLat, gpsLng, gpsAccRadius);
+}
+function stopGpsAnim() {
+  if (gpsPingTimer) { clearInterval(gpsPingTimer); gpsPingTimer = null; }
+  if (gpsAnimRaf) { cancelAnimationFrame(gpsAnimRaf); gpsAnimRaf = null; }
+}
+// Kick off the rAF loop once when the map is ready
+map.on('load', function() { if (!gpsAnimRaf) gpsAnimRaf = requestAnimationFrame(gpsAnimationFrame); });
+
+map.on('move', () => { if (gpsFix && gpsLat!==null) updateGpsAccCircle(gpsLat, gpsLng, gpsAccRadius); });
+let gpsAccRadius = 10;
+
+function startGPS() {
+  if (!navigator.geolocation) { document.getElementById('acc-label').textContent='No GPS'; return; }
+  startGPSWatch();
+}
+function startGPSWatch() {
+  if (gpsWatch) navigator.geolocation.clearWatch(gpsWatch);
+  document.getElementById('acc-label').textContent = 'Requesting location...';
+  navigator.geolocation.getCurrentPosition(
+    function(pos){ document.getElementById('acc-label').textContent='GPS acquired!'; doWatch(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy); },
+    function(err){
+      document.getElementById('acc-label').textContent='GPS: '+(err.message||'').substring(0,20);
+      setTimeout(function(){
+        navigator.geolocation.getCurrentPosition(
+          function(pos2){ document.getElementById('acc-label').textContent='GPS acquired!'; doWatch(pos2.coords.latitude, pos2.coords.longitude, pos2.coords.accuracy); },
+          function(err2){
+            document.getElementById('acc-label').textContent='GPS blocked';
+            document.getElementById('gps-indicator').className='gps-dot no-fix';
+            if((err.message||'').indexOf('secure')>-1 || (err.message||'').indexOf('https')>-1) document.getElementById('acc-label').textContent='Need HTTPS';
+          },
+          { enableHighAccuracy:true, timeout:15000, maximumAge:60000 }
+        );
+      }, 1000);
+    },
+    { enableHighAccuracy:true, timeout:15000, maximumAge:60000 }
+  );
+}
+function doWatch(lat, lng, accuracy) {
+  const f = filterFix(lat, lng, accuracy) || { lat, lng, acc: accuracy };
+  lat = f.lat; lng = f.lng; accuracy = f.acc;
+  gpsRawLat = lat; gpsRawLng = lng; gpsAccRadius = accuracy;
+  gpsTargetLat = lat; gpsTargetLng = lng;   // seed target immediately
+  if (gpsLat === null || gpsLng === null) { gpsLat = lat; gpsLng = lng; }
+  if (!gpsMarker) { ensureGpsLayers(); }
+  gpsMarker.setLngLat([gpsLng, gpsLat]);
+  gpsFix = true;
+  document.getElementById('gps-indicator').className = 'gps-dot fix';
+  document.getElementById('acc-label').textContent = accuracyLabel(accuracy);
+  map.easeTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), ZOOM), duration: 600 });
+  updateGpsAccCircle(gpsLat, gpsLng, accuracy);
+  startGpsPing();   // begin the 250ms ping loop (no-op if already running)
+  if (gpsWatch) navigator.geolocation.clearWatch(gpsWatch);
+  gpsWatch = navigator.geolocation.watchPosition(
+    function(pos){
+      let lat2=pos.coords.latitude, lng2=pos.coords.longitude, a2=pos.coords.accuracy;
+      const clean = filterFix(lat2,lng2,a2);
+      if (!clean) return;
+      lat2=clean.lat; lng2=clean.lng; a2=clean.acc;
+      // Record the newest smoothed fix; the 250ms ping adopts it as target
+      // and the rAF loop drifts the visible dot toward it.
+      gpsRawLat=lat2; gpsRawLng=lng2; gpsAccRadius=a2;
+      if (!gpsTargetLat || gpsTargetLat===null) { gpsTargetLat=lat2; gpsTargetLng=lng2; }
+      document.getElementById('gps-indicator').className='gps-dot fix';
+      let label=accuracyLabel(a2);
+      if (bestFixAcc!==null) label += ' · best '+bestFixAcc.toFixed(1)+'m';
+      document.getElementById('acc-label').textContent=label;
+    },
+    function(err){ document.getElementById('gps-indicator').className='gps-dot no-fix'; document.getElementById('acc-label').textContent='GPS lost'; },
+    { enableHighAccuracy:true, timeout:10000, maximumAge:0 }
+  );
+}
+function centerGPS() {
+  if (gpsFix && gpsLat!==null) {
+    map.easeTo({ center:[gpsLng,gpsLat], zoom:Math.max(map.getZoom(),18), duration:600 });
+  } else {
+    if (gpsWatch) navigator.geolocation.clearWatch(gpsWatch); gpsWatch=null;
+    resetGPSFilter(); startGPS();
+  }
+}
+
+// ====== PINS ======
+let pinMode = false;
+const TYPE_ICONS = { 'Food':'🍔','Info':'ℹ️','Activity':'🎯','Retail':'🛒','ER':'🏥','Entertainment':'🎪','Drink':'🥤','Parking':'🅿️','Generator':'⚡','Restroom':'🚻','Other':'📍' };
+const TYPE_COLORS = { 'Food':'#e74c3c','Info':'#f1c40f','Activity':'#e67e22','Retail':'#2ecc71','ER':'#c0392b','Entertainment':'#9b59b6','Drink':'#3498db','Parking':'#7f8c8d','Generator':'#f39c12','Restroom':'#1abc9c','Other':'#3498db' };
+const pinMarkers = {};
+let pinCounter = 0;
+
+function togglePinMode() {
+  pinMode = !pinMode;
+  document.getElementById('btn-pin').classList.toggle('active', pinMode);
+  document.getElementById('btn-pin').textContent = pinMode ? '📍 Tap map' : '📍 Pin';
+  document.getElementById('map').classList.toggle('place-cursor', pinMode);
+  if (pinMode) showPlaceToast();
+}
+function showPlaceToast() {
+  var t = document.getElementById('rot-tip');
+  t.textContent = '📍 Tap anywhere on the map to place a pin';
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); t.textContent='🔄 Two-finger twist to rotate · drag to tilt'; }, 2500);
+}
+
+// Tap-to-place (only when pin mode is on AND not interacting with a marker)
+map.on('click', function(e) {
+  if (!pinMode) return;
+  const lngLat = e.lngLat;
+  const label = prompt('Pin name:', 'Pin');
+  if (label === null) { exitPinMode(); return; }
+  const types = ['Food','Info','Activity','Retail','ER','Entertainment','Drink','Parking','Generator','Restroom','Other'];
+  const type = prompt('Type (' + types.join(', ') + '):', 'Other') || 'Other';
+  const icon = TYPE_ICONS[type] || '📍';
+  const color = TYPE_COLORS[type] || '#3498db';
+  createPin([lngLat.lat, lngLat.lng], label, type, icon, color);
+  exitPinMode();
+});
+
+function createPin(latlng, label, type, icon, color) {
+  const stamp = ++pinCounter;
+  const el = document.createElement('div');
+  el.className = 'custom-marker';
+  el.style.background = color;
+  el.textContent = icon;
+  el.title = label;
+  const m = new maplibregl.Marker({ element: el, draggable: true })
+    .setLngLat([latlng[1], latlng[0]])
+    .addTo(map);
+  m._pinData = { label, type, icon, color };
+  m._pinStamp = stamp;
+  pinMarkers[stamp] = m;
+  m.on('dragend', function() { savePins(); });
+  m.getElement().addEventListener('click', function(ev) {
+    ev.stopPropagation();
+    openPinPopup(m);
+  });
+  return m;
+}
+function openPinPopup(m) {
+  const d = m._pinData;
+  const ll = m.getLngLat();
+  const html = '<div class="pin-popup"><h3>'+(d.label||'Pin')+'</h3>' +
+    (d.type!=='Other' ? '<div class="type">'+d.type+'</div>' : '') +
+    '<div class="coords">'+ll.lat.toFixed(6)+', '+ll.lng.toFixed(6)+'</div>' +
+    '<button class="del-pin-btn" onclick="deleteSpecificPin('+m._pinStamp+')">🗑 Delete this pin</button></div>';
+  new maplibregl.Popup({ closeButton: true, offset: 16 })
+    .setLngLat(ll)
+    .setHTML(html)
+    .addTo(map);
+}
+function deleteSpecificPin(stamp) {
+  if (pinMarkers[stamp]) { pinMarkers[stamp].remove(); delete pinMarkers[stamp]; savePins(); }
+  document.querySelectorAll('.maplibregl-popup').forEach(p=>p.remove());
+}
+function deleteAllPins() {
+  const count = Object.keys(pinMarkers).length;
+  if (count === 0) return;
+  if (!confirm('Delete all ' + count + ' pin(s)? This cannot be undone.')) return;
+  Object.keys(pinMarkers).forEach(k => pinMarkers[k].remove());
+  for (const k in pinMarkers) delete pinMarkers[k];
+  exitPinMode();
+  savePins();
+}
+function exitPinMode() {
+  pinMode = false;
+  document.getElementById('btn-pin').classList.remove('active');
+  document.getElementById('btn-pin').textContent = '📍 Pin';
+  document.getElementById('map').classList.remove('place-cursor');
+}
+
+// ====== PERSIST ======
+function savePins() {
+  const pins = [];
+  for (const k in pinMarkers) {
+    const m = pinMarkers[k], d = m._pinData, ll = m.getLngLat();
+    pins.push({ lat: ll.lat, lng: ll.lng, label: d.label || 'Pin', type: d.type || 'Other', icon: d.icon || '📍', color: d.color || '#3498db' });
+  }
+  try { localStorage.setItem('pumpfest_pins', JSON.stringify(pins)); } catch(e) {}
+}
+function loadPins() {
+  try {
+    const raw = localStorage.getItem('pumpfest_pins');
+    if (!raw) return;
+    JSON.parse(raw).forEach(p => createPin([p.lat, p.lng], p.label||'Pin', p.type||'Other', p.icon||'📍', p.color||'#3498db'));
+  } catch(e) {}
+}
+
+// ====== SATELLITE TOGGLE ======
+let satAdded = false, satLayerOn = false;
+function ensureSatellite() {
+  if (satAdded) return;
+  map.addSource('satellite-img', {
+    type: 'raster',
+    tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+    tileSize: 256,
+    maxzoom: 19
+  });
+  map.addLayer({ id: 'satellite-layer', type: 'raster', source: 'satellite-img', paint: { 'raster-opacity': 1 } }, 'overlay-layer');
+  satAdded = true;
+}
+function toggleSatellite() {
+  if (!satAdded) ensureSatellite();
+  if (satLayerOn) {
+    map.removeLayer('satellite-layer');
+    satLayerOn = false;
+    document.getElementById('btn-sat').classList.remove('active');
+    document.getElementById('btn-sat').textContent = '🛰 Satellite';
+  } else {
+    map.addLayer({ id:'satellite-layer', type:'raster', source:'satellite-img', paint:{'raster-opacity':1} }, 'overlay-layer');
+    satLayerOn = true;
+    document.getElementById('btn-sat').classList.add('active');
+    document.getElementById('btn-sat').textContent = '🛰 Map';
+  }
+}
+
+// ====== UTILITIES ======
+function resetMap() {
+  northUp();
+  map.easeTo({ center: [CENTER[1], CENTER[0]], zoom: ZOOM, bearing: START_BEARING, pitch: 0, duration: 700 });
+  // reset overlay position
+  if (overlayAdded && map.getSource('overlay-img')) {
+    map.getSource('overlay-img').setCoordinates(overlayCorners);
+    setOverlayOpacity(1.0);
+    document.getElementById('op-slider').value = 100;
+  }
+}
+function showHelp2() {
+  alert('🎃 Pumpkinfest GPS Map (MapLibre)\n\n'+
+    '📍 GPS — tap to center on your blue dot\n📍 Pin — tap, then tap the map to place a marker\n'+
+    '🗑 All — delete every pin at once\n🗺 Reset — north-up, recenter, reset overlay\n'+
+    '🛰 Satellite — toggle aerial view\n'+
+    '🔄 NEW: Two-finger twist = rotate view\n'+
+    '🔄 Two-finger drag up/down = tilt (3D)\n'+
+    '🧭 North-up — snap rotation/tilt back to north\n'+
+    'Opacity slider controls overlay see-through\n\n'+
+    '📡 GPS accuracy: tap GPS then check the +·best readout');
+}
+
+// ====== CALIBRATION ======
+function doneCal() { document.getElementById('cal-panel').classList.add('hidden'); startGPS(); loadPins(); }
+function skipCal() { document.getElementById('cal-panel').classList.add('hidden'); startGPS(); loadPins(); }
+</script>
+</body>
+</html>

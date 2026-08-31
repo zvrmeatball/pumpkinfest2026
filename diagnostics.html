@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🛰 Pumpkinfest GPS Diagnostics</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #1a1a2e; color: #eee; min-height: 100vh; padding: 20px;
+  }
+  .wrap { max-width: 560px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: #888; font-size: 0.85rem; margin-bottom: 18px; }
+
+  .card {
+    background: #242442; border-radius: 14px; padding: 18px; margin-bottom: 14px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .big-acc {
+    font-size: 2.6rem; font-weight: 800; line-height: 1; text-align: center;
+    margin: 8px 0 2px;
+  }
+  .acc-unit { font-size: 0.9rem; color: #aaa; text-align: center; display: block; margin-bottom: 8px; }
+  .qa { text-align: center; font-size: 0.9rem; margin-bottom: 4px; }
+
+  .stat { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.92rem; }
+  .stat:last-child { border-bottom: none; }
+  .stat .k { color: #999; }
+  .stat .v { font-weight: 600; }
+
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+  .dot.good { background: #4caf50; box-shadow: 0 0 8px #4caf50; }
+  .dot.ok { background: #ffb347; box-shadow: 0 0 8px #ffb347; }
+  .dot.bad { background: #f44336; box-shadow: 0 0 8px #f44336; }
+
+  .btn {
+    width: 100%; padding: 14px; border: none; border-radius: 12px;
+    background: #ff6b35; color: #fff; font-size: 1rem; font-weight: 700; cursor: pointer;
+  }
+  .btn:hover { background: #e85d2a; }
+  .btn-sml {
+    width: auto; display: inline-block; padding: 8px 14px; font-size: 0.8rem;
+    background: rgba(255,255,255,0.1); border-radius: 8px; margin-top: 8px;
+  }
+
+  .guide h3 { font-size: 1rem; color: #ffb347; margin: 12px 0 6px; }
+  .guide ol { padding-left: 18px; }
+  .guide li { margin: 5px 0; font-size: 0.9rem; color: #ddd; line-height: 1.4; }
+
+  .ok { color: #9be0b3; }
+  .warn { color: #ffd699; }
+  .err { color: #f0a9a9; }
+  a { color: #7fb3ff; text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🛰 GPS Diagnostics</h1>
+  <div class="sub">Pumpkinfest 2026 map — live receiver status &amp; accuracy guide</div>
+
+  <div class="card">
+    <span class="qa" id="qa">No fix yet — waiting for GPS…</span>
+    <div class="big-acc" id="acc">--</div>
+    <span class="acc-unit" id="accUnit">meters accuracy</span>
+    <div class="stat"><span class="k">Status</span><span class="v" id="status">Searching…</span></div>
+    <div class="stat"><span class="k">Best fix</span><span class="v" id="best">--</span></div>
+    <div class="stat"><span class="k">Latitude</span><span class="v" id="lat">--</span></div>
+    <div class="stat"><span class="k">Longitude</span><span class="v" id="lng">--</span></div>
+    <div class="stat"><span class="k">Heading</span><span class="v" id="heading">--</span></div>
+    <div class="stat"><span class="k">Speed</span><span class="v" id="speed">--</span></div>
+    <div class="stat"><span class="k">Altitude</span><span class="v" id="alt">--</span></div>
+    <div class="stat"><span class="k">Satellites</span><span class="v" id="sats">n/a*</span></div>
+    <div style="text-align:center; margin-top:10px;">
+      <button class="btn-sml" onclick="resetBest()">↺ Reset best fix</button>
+    </div>
+  </div>
+
+  <button class="btn" onclick="startGPS()">📍 Start GPS</button>
+  <div style="text-align:center; margin-top:10px;">
+    <a href="index.html">← Back to map</a>
+  </div>
+
+  <div class="card guide">
+    <h2 style="font-size:1.1rem; color:#fff;">📡 Getting to 2m accuracy</h2>
+    <p class="sub" style="margin-bottom:8px;">The receiver reports <b>accuracy = radius of error</b>. Smaller = better.</p>
+    <h3>On your phone (biggest win)</h3>
+    <ol>
+      <li>Stand <b>outdoors in open sky</b> — away from buildings, trees, and walls. The school fields are ideal.</li>
+      <li><b>Enable "high accuracy" / GPS + network</b> in Location settings (not "battery saving").</li>
+      <li>Let it <b>settle 5–15 seconds</b> before moving — accuracy tightens as more satellites lock.</li>
+      <li>Hold the phone still toward the sky, pointed up, for best signal.</li>
+      <li><b>Disable Bluetooth/Wi-Fi scanning</b> if the dot keeps jumping (can swap location sources).</li>
+    </ol>
+    <h3>Environment matters</h3>
+    <ol>
+      <li>2m is only reachable with <b>clear sky + high-accuracy mode</b>. Indoors or near tall walls it falls to 10–50m.</li>
+      <li>Clouds/rain rarely hurt GPS, but metal roofs and densely packed trees do.</li>
+      <li>If you're near the school buildings, step away from the walls.</li>
+    </ol>
+    <h3>How to read the color</h3>
+    <ol>
+      <li><span class="dot good"></span><b>Green &lt; 3m</b> — excellent (best for pinning spots)</li>
+      <li><span class="dot ok"></span><b>Yellow 3–8m</b> — good, typical for phones</li>
+      <li><span class="dot bad"></span><b>Orange &gt; 8m</b> — poor; recheck sky/exposure</li>
+    </ol>
+    <p style="margin-top:10px; font-size:0.8rem; color:#888;">
+      *Browser apps can't read the raw satellite count (not exposed by the OS/browser).
+      Quality is estimated from the accuracy the device reports.
+    </p>
+  </div>
+</div>
+
+<script>
+let bestAcc = null;
+let watchId = null;
+
+function el(id) { return document.getElementById(id); }
+function fmt(v, d) { return (v === null || v === undefined || isNaN(v)) ? '--' : (+v).toFixed(d === undefined ? 1 : d); }
+
+function quality(acc) {
+  if (acc === null) return { cls: 'err', text: 'No fix yet' };
+  if (acc < 3)  return { cls: 'ok',   text: '🟢 Excellent — pin them spots!' };
+  if (acc < 8)  return { cls: 'ok',   text: '🟡 Good — typical phone accuracy' };
+  if (acc < 15) return { cls: 'warn', text: '🟠 Fair — check sky exposure' };
+  return { cls: 'err', text: '🔴 Poor — move to open sky' };
+}
+
+function update(pos) {
+  const c = pos.coords;
+  const acc = c.accuracy != null ? c.accuracy : null;
+  if (acc !== null && (bestAcc === null || acc < bestAcc)) bestAcc = acc;
+
+  const q = quality(acc);
+  el('qa').textContent = q.text;
+  el('qa').className = 'qa ' + q.cls;
+  el('acc').textContent = acc !== null ? fmt(acc) + 'm' : '--';
+  el('status').innerHTML = '<span class="dot ' + (q.cls==='ok'?'good':q.cls==='warn'?'ok':'bad') + '"></span>' + (q.cls==='ok'?'FIXED':'LOCKED');
+  el('best').textContent = bestAcc !== null ? fmt(bestAcc) + 'm' : '--';
+  el('lat').textContent = c.latitude != null ? c.latitude.toFixed(7) : '--';
+  el('lng').textContent = c.longitude != null ? c.longitude.toFixed(7) : '--';
+  el('heading').textContent = (c.heading != null && !isNaN(c.heading)) ? Math.round(c.heading) + '°' : '--';
+  el('speed').textContent = (c.speed != null && !isNaN(c.speed)) ? (c.speed*3.6).toFixed(1) + ' km/h' : '--';
+  el('alt').textContent = (c.altitude != null && !isNaN(c.altitude)) ? fmt(c.altitude) + ' m' : '--';
+}
+
+function startGPS() {
+  if (!navigator.geolocation) { el('status').textContent = 'No GPS support'; return; }
+  el('status').textContent = 'Requesting location…';
+  if (watchId) navigator.geolocation.clearWatch(watchId);
+  // Do an immediate single fix, then keep watching.
+  navigator.geolocation.watchPosition(
+    update,
+    err => { el('status').textContent = 'GPS error: ' + (err.message || err.code); },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+}
+
+function resetBest() { bestAcc = null; el('best').textContent = '--'; }
+</script>
+</body>
+</html>
