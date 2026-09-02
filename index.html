@@ -136,6 +136,27 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .pin-popup .coords { font-size: 0.7rem; color: #bbb; margin-top: 4px; }
 .pin-popup .del-pin-btn { background: #e74c3c; color: #fff; border: none; padding: 6px 16px; border-radius: 8px; font-size: 0.8rem; cursor: pointer; margin-top: 8px; width: 100%; font-weight: 600; }
 
+/* Overlay corner alignment handles */
+.overlay-corner-handle {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #ff9800; border: 3px solid #fff;
+  box-shadow: 0 0 0 2px rgba(255,152,0,0.6), 0 2px 8px rgba(0,0,0,0.4);
+  cursor: grab; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #000;
+  user-select: none;
+}
+.overlay-corner-handle:active { cursor: grabbing; transform: scale(1.15); }
+.overlay-corner-handle.tl { background:#ff5252; }
+.overlay-corner-handle.tr { background:#ffb300; }
+.overlay-corner-handle.br { background:#69f0ae; }
+.overlay-corner-handle.bl { background:#40c4ff; }
+#align-tip {
+  position: fixed; top: 60px; left: 50%; transform: translateX(-50%); z-index: 10050;
+  background: rgba(0,0,0,0.85); color: #fff; padding: 8px 16px; border-radius: 10px;
+  font-size: 0.85rem; border: 1px solid rgba(255,255,255,0.2); text-align: center;
+  max-width: 92vw; display: none;
+}
+
 /* GPS accuracy circle (canvas overlay) */
 #gps-acc {
   position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -204,12 +225,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 </div>
 
 <div id="rot-tip">🔄 Two-finger twist to rotate · drag to tilt</div>
+<div id="align-tip">⚙️ Drag the 4 colored corner handles to line them up on the ground.<br>When close, tap <strong>⚙️ Align</strong> (or <strong>Escape</strong>) to save &amp; see the numbers.</div>
 
 <div id="bottom-bar">
   <button id="btn-gps" onclick="centerGPS()"><span class="gps-dot no-fix" id="gps-indicator"></span>GPS</button>
   <button id="btn-pin" onclick="togglePinMode()">📍 Pin</button>
   <button class="danger" onclick="deleteAllPins()" title="Delete all pins">🗑 All</button>
   <button id="btn-sat" onclick="toggleSatellite()">🛰 Satellite</button>
+  <button id="btn-align" onclick="toggleAlignMode()" title="Drag overlay corners to align">⚙️ Align</button>
   <button title="GPS diagnostics" onclick="location.href='diagnostics.html'">📡</button>
   <button title="Help" onclick="showHelp2()">❓</button>
   <span class="acc-label" id="acc-label"></span>
@@ -689,6 +712,69 @@ function showHelp2() {
 // ====== CALIBRATION ======
 function doneCal() { document.getElementById('cal-panel').classList.add('hidden'); startGPS(); loadPins(); }
 function skipCal() { document.getElementById('cal-panel').classList.add('hidden'); startGPS(); loadPins(); }
+
+// ====== OVERLAY CORNER ALIGNMENT (drag 4 handles) ======
+let alignMode = false;
+let cornerHandles = {}; // tl, tr, br, bl -> Marker
+// Handle marker element colours per corner
+function cornerHandleEl(label) {
+  const el = document.createElement('div');
+  el.className = 'overlay-corner-handle ' + label;
+  el.textContent = label.toUpperCase().replace('BR','BR').slice(0,2);
+  return el;
+}
+function syncHandlePositions() {
+  const order = ['tl','tr','br','bl'];
+  order.forEach(function(k, i) {
+    if (cornerHandles[k]) cornerHandles[k].setLngLat([overlayCorners[i][0], overlayCorners[i][1]]);
+  });
+}
+function enterAlignMode() {
+  if (!overlayAdded) ensureOverlay();
+  if (!map.getSource('overlay-img')) return;
+  alignMode = true;
+  document.getElementById('btn-align').classList.add('active');
+  document.getElementById('btn-align').textContent = '✅ Done';
+  document.getElementById('align-tip').style.display = 'block';
+  const order = ['tl','tr','br','bl'];
+  order.forEach(function(k, i) {
+    if (cornerHandles[k]) cornerHandles[k].remove();
+    const m = new maplibregl.Marker({ element: cornerHandleEl(k), anchor: 'center', draggable: true })
+      .setLngLat([overlayCorners[i][0], overlayCorners[i][1]])
+      .addTo(map);
+    m.on('drag', function() {
+      const ll = m.getLngLat();
+      overlayCorners[i] = [ll.lng, ll.lat];
+      if (map.getSource('overlay-img')) map.getSource('overlay-img').setCoordinates(overlayCorners);
+    });
+    m._cornerKey = k; m._cornerIdx = i;
+    cornerHandles[k] = m;
+  });
+}
+function exitAlignMode(save) {
+  alignMode = false;
+  document.getElementById('btn-align').classList.remove('active');
+  document.getElementById('btn-align').textContent = '⚙️ Align';
+  document.getElementById('align-tip').style.display = 'none';
+  Object.keys(cornerHandles).forEach(function(k){ cornerHandles[k].remove(); });
+  cornerHandles = {};
+  if (save) {
+    // Build a string Zach can paste back to me so I can bake it in.
+    var s = overlayCorners.map(function(c){ return '['+c[0].toFixed(8)+', '+c[1].toFixed(8)+']'; }).join(', ');
+    alert('Saved corners (send these to Derp):\n\nconst overlayCorners = [\n  '+s.replace(/, /g, ',\n  ')+'\n];');
+    // persist to localStorage so a reload keeps them
+    try { localStorage.setItem('pf_overlayCorners', JSON.stringify(overlayCorners)); } catch(e){}
+  }
+}
+function toggleAlignMode() {
+  if (alignMode) { exitAlignMode(true); }
+  else { enterAlignMode(); }
+}
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && alignMode) exitAlignMode(true); });
+// Restore saved corners on load if present
+(function(){
+  try { var s = localStorage.getItem('pf_overlayCorners'); if (s) { var arr = JSON.parse(s); if (arr && arr.length===4 && Array.isArray(arr[0])) overlayCorners.length=0; arr.forEach(function(c){overlayCorners.push(c);}); } } catch(e){}
+})();
 </script>
 </body>
 </html>
